@@ -10,6 +10,12 @@ const POSTS = gql`
     allPosts {
       id
       title
+      Comments {
+        id
+        post_id
+        body
+        date
+      }
     }
   }
 `;
@@ -28,20 +34,102 @@ const REMOVE_POST = gql`
     removePost(id: $id)
   }
 `;
+
+const UPDATE_COMMENT = gql`
+  mutation($commentId: ID!, $commentBody: String!) {
+    updateComment(id: $commentId, body: $commentBody) {
+      id
+      body
+    }
+  }
+`;
+
+const DELETE_COMMENT = gql`
+  mutation($commentId: ID!) {
+    removeComment(id: $commentId)
+  }
+`;
 function App() {
   const { loading, error, data } = useQuery(POSTS);
   const [updatePost] = useMutation(UPDATE_POST);
   const [removePost] = useMutation(REMOVE_POST);
+  const [updateComment] = useMutation(UPDATE_COMMENT);
+  const [deleteComment] = useMutation(DELETE_COMMENT);
 
   if (loading) {
     return 'loading';
   }
   return (
-    <div className="App">
+    <div>
+      <p>
+        all buttons are <strong>Optimistic operation</strong>, turn on <strong>3G fast</strong>{' '}
+        network on Chrome to see the differences
+      </p>
       <div>
+        <p>
+          <strong>posts</strong> json data from <strong>json-graphql-server</strong> ( db.js )
+        </p>
         {data.allPosts.map(post => (
-          <div>
-            post.id: {post.id}, title {post.title}
+          <div style={{ margin: '10px' }}>
+            <pre>{JSON.stringify(post, undefined, 2)}</pre>
+            <button
+              onClick={() => {
+                if (post.Comments && post.Comments.length > 0) {
+                  updateComment({
+                    variables: {
+                      commentId: post.Comments[0].id,
+                      commentBody: `prada prada update ${Math.random()} `,
+                    },
+                    optimisticResponse: {
+                      __typename: 'Mutation',
+                      updateComment: {
+                        id: post.Comments[0].id,
+                        body: `prada prada Optimistic update... ${Math.random()} `,
+                        __typename: 'Comment',
+                      },
+                    },
+                  });
+                }
+              }}
+            >
+              Update Comment
+            </button>
+            <button
+              onClick={() => {
+                if (post.Comments && post.Comments.length > 0) {
+                  deleteComment({
+                    variables: {
+                      commentId: post.Comments[0].id,
+                    },
+                    optimisticResponse: {
+                      __typename: 'Mutation',
+                      optimisticRemoveComment: {
+                        id: post.Comments[0].id,
+                      },
+                    },
+                    update: (proxy, { data = {} }) => {
+                      console.log('data', data);
+                      if (data.optimisticRemoveComment || data.removeComment === true) {
+                        const postsData = proxy.readQuery({
+                          query: POSTS,
+                        });
+                        console.log('postsData', postsData);
+                        const index = postsData.allPosts.findIndex(p => p.id === post.id);
+                        postsData.allPosts[index].Comments.splice(0, 1);
+                        console.log(`postsData`, postsData);
+
+                        proxy.writeQuery({
+                          query: POSTS,
+                          data: postsData,
+                        });
+                      }
+                    },
+                  });
+                }
+              }}
+            >
+              Delete Comment
+            </button>
             <button
               onClick={() => {
                 updatePost({
@@ -57,7 +145,7 @@ function App() {
                 });
               }}
             >
-              Update
+              Update Post Title
             </button>
             <button
               onClick={() => {
@@ -94,7 +182,7 @@ function App() {
                 });
               }}
             >
-              Delete
+              Delete Post Title
             </button>
           </div>
         ))}

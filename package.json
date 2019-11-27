@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "start": " json-graphql-server ./db.js"
+  },
+  "dependencies": {
+    "global": "^4.4.0",
+    "json-graphql-server": "^2.1.3"
+  }
+}
